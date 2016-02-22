@@ -1,0 +1,513 @@
+﻿{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourcegroup().location]",
+      "metadata": {
+        "description": "This is the region where the resources will be created"
+      }
+    },
+    "virtualNetworkName": {
+      "type": "string",
+      "defaultValue": "First_ARM_VNet",
+      "metadata": {
+        "description": "This is your Virtual Network"
+      }
+    },
+    "addressPrefix": {
+      "type": "string",
+      "defaultValue": "172.20.0.0/16",
+      "metadata": {
+        "description": "The CIDR address space for your Virtual Network in Azure"
+      }
+    },
+    "DMZ01": {
+      "type": "string",
+      "defaultValue": "172.20.1.0/24",
+      "metadata": {
+        "description": "This is CIDR prefix for the DMZ Subnet"
+      }
+    },
+    "APP01": {
+      "type": "string",
+      "defaultValue": "172.20.2.0/24",
+      "metadata": {
+        "description": "This is CIDR prefix for the Application Subnet"
+      }
+    },
+      "INS01": {
+      "type": "string",
+      "defaultValue": "172.20.3.0/24",
+      "metadata": {
+        "description": "This is CIDR prefix for the Inside Subnet"
+      }
+    },
+      "AUTH": {
+      "type": "string",
+      "defaultValue": "172.20.254.191/28",
+      "metadata": {
+        "description": "This is CIDR prefix for the Active Directory authorisation Subnet"
+      }
+    },
+    "BASTION": {
+      "type": "string",
+      "defaultValue": "172.20.254.224/28",
+      "metadata": {
+        "description": "This is CIDR prefix for the Rackspace Bastion Subnet"
+      }
+    },
+      "GatewaySubnet": {
+      "type": "string",
+      "defaultValue": "172.20.254.240/28",
+      "metadata": {
+        "description": "This is CIDR prefix for the VPN Gateway Subnet"
+      }
+    },
+    "DMZNSGName": {
+      "type": "string",
+      "defaultValue": "DMZ_NSG",
+      "metadata": {
+        "description": "This is name of the networkSecurityGroup that will be assigned to the DMZ Subnet"
+      }
+    },
+    "APPNSGName": {
+      "type": "string",
+      "defaultValue": "APP_NSG",
+      "metadata": {
+        "description": "This is name of the networkSecurityGroup that will be assigned to the Application Subnet"
+      }
+    },
+    "INSNSGName": {
+      "type": "string",
+      "defaultValue": "INS_NSG",
+      "metadata": {
+        "description": "This is name of the networkSecurityGroup that will be assigned to the Inside Subnet"
+      }
+    },
+      "AUTHNSGName": {
+      "type": "string",
+      "defaultValue": "AUTH_NSG",
+      "metadata": {
+        "description": "This is name of the networkSecurityGroup that will be assigned to the Active Directory authorisation Subnet"
+      }
+    },
+    "BASTNSGName": {
+      "type": "string",
+      "defaultValue": "BAST_NSG",
+      "metadata": {
+        "description": "This is name of the networkSecurityGroup that will be assigned to the Rackspace Bastion Subnet"
+      }
+    },
+  },
+      "variables": {
+    },
+  "resources": [
+   	   {
+      "apiVersion": "2015-05-01-preview",
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "name": "[parameters('DMZNSGName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "securityRules": [
+          {
+              "name": "Allow_LOCAL_SUBNET_INBOUND",
+              "properties": {
+              "description": "AllOW Intra subnet traffic",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefix": "172.24.1.0/24",
+              "destinationAddressPrefix": "172.24.1.0/24",
+              "access": "Allow",
+              "priority": 3750,
+              "direction": "Inbound"
+            }
+          },
+		  {
+              "name": "Allow_RACKSPACE_BASTION_RDP_INBOUND",
+              "properties": {
+              "description": "Allow Bastion access",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefix": "172.24.254.240/28",
+              "destinationAddressPrefix": "172.24.1.0/24",
+              "access": "Allow",
+              "priority": 3751,
+              "direction": "Inbound"
+            }
+          },
+		  {
+              "name": "Allow_RACKSPACE_BASTION_SSH_INBOUND",
+              "properties": {
+              "description": "Allow RDP",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "22",
+              "sourceAddressPrefix": "172.24.254.240/28",
+              "destinationAddressPrefix": "172.24.1.0/24",
+              "access": "Allow",
+              "priority": 3752,
+              "direction": "Inbound"
+            }
+          },
+		  {
+              "name": "Allow_AZURE_LB_INBOUND",
+              "properties": {
+              "description": "Allow Azure LB Inbound",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "AZURELOADBALANCER",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 3753,
+              "direction": "Inbound"
+            }
+          },
+          {
+			  "name": "Block_ALL_INBOUND",
+              "properties": {
+              "description": "Block All Inbound Traffic",
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "*",
+              "access": "Deny",
+              "priority": 3754,
+              "direction": "Inbound"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "2015-05-01-preview",
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "name": "[parameters('APPNSGName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "securityRules": [
+          {
+            "name": "Allow_FE",
+            "properties": {
+              "description": "Allow FE Subnet",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "443",
+              "sourceAddressPrefix": "10.0.0.0/24",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 100,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "Block_RDP_Internet",
+            "properties": {
+              "description": "Block RDP",
+              "protocol": "tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefix": "Internet",
+              "destinationAddressPrefix": "*",
+              "access": "Deny",
+              "priority": 101,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "Block_Internet_Outbound",
+            "properties": {
+              "description": "Block Internet",
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "Internet",
+              "access": "Deny",
+              "priority": 200,
+              "direction": "Outbound"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "2015-05-01-preview",
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "name": "[parameters('INSNSGName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "securityRules": [
+          {
+            "name": "Allow_FE",
+            "properties": {
+              "description": "Allow FE Subnet",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "443",
+              "sourceAddressPrefix": "10.0.0.0/24",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 100,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "Block_RDP_Internet",
+            "properties": {
+              "description": "Block RDP",
+              "protocol": "tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefix": "Internet",
+              "destinationAddressPrefix": "*",
+              "access": "Deny",
+              "priority": 101,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "Block_Internet_Outbound",
+            "properties": {
+              "description": "Block Internet",
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "Internet",
+              "access": "Deny",
+              "priority": 200,
+              "direction": "Outbound"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "2015-05-01-preview",
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "name": "[parameters('AUTHNSGName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "securityRules": [
+          {
+            "name": "Allow_FE",
+            "properties": {
+              "description": "Allow FE Subnet",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "443",
+              "sourceAddressPrefix": "10.0.0.0/24",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 100,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "Block_RDP_Internet",
+            "properties": {
+              "description": "Block RDP",
+              "protocol": "tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefix": "Internet",
+              "destinationAddressPrefix": "*",
+              "access": "Deny",
+              "priority": 101,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "Block_Internet_Outbound",
+            "properties": {
+              "description": "Block Internet",
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "Internet",
+              "access": "Deny",
+              "priority": 200,
+              "direction": "Outbound"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "2015-05-01-preview",
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "name": "[parameters('BASTNSGName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "securityRules": [
+         		   {
+            "name": "Allow_RACK_IAD2_RDP_INBOUND",
+            "properties": {
+              "description": "Bastion access from RAX BAST IAD2",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefix": "69.20.0.1/32",
+              "destinationAddressPrefix": "172.20.254.192/28",
+              "access": "Allow",
+              "priority": 3650,
+              "direction": "Inbound"
+            }
+          },
+		  		   {
+            "name": "Allow_RACK_DFW1_RDP_INBOUND",
+            "properties": {
+              "description": "Bastion access from RAX BAST DFW1",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefix": "72.3.128.84/32",
+              "destinationAddressPrefix": "172.20.254.192/28",
+              "access": "Allow",
+              "priority": 3651,
+              "direction": "Inbound"
+            }
+          },
+		  		   {
+            "name": "Allow_RACK_HKG1_RDP_INBOUND",
+            "properties": {
+              "description": "Bastion access from RAX BAST HKG1",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefix": "120.136.34.22/32",
+              "destinationAddressPrefix": "172.20.254.192/28",
+              "access": "Allow",
+              "priority": 3652,
+              "direction": "Inbound"
+            }
+          },
+		  		   {
+            "name": "Allow_RACK_LON3_RDP_INBOUND",
+            "properties": {
+              "description": "Bastion access from RAX BAST LON3",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefix": "212.100.225.42/32",
+              "destinationAddressPrefix": "172.20.254.192/28",
+              "access": "Allow",
+              "priority": 3653,
+              "direction": "Inbound"
+            }
+          },
+		  		   {
+            "name": "Allow_RACK_SYD2_RDP_INBOUND",
+            "properties": {
+              "description": "Bastion access from RAX BAST SYD2",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefix": "119.9.4.2/32",
+              "destinationAddressPrefix": "172.20.254.192/28",
+              "access": "Allow",
+              "priority": 3654,
+              "direction": "Inbound"
+            }
+          },
+		  		   {
+            "name": "Block_ALL_INBOUND",
+            "properties": {
+              "description": "Block All Inbound Traffic",
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "*",
+              "access": "Deny",
+              "priority": 4000,
+              "direction": "Inbound"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "2015-05-01-preview",
+      "type": "Microsoft.Network/virtualNetworks",
+      "name": "[parameters('virtualNetworkName')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[concat('Microsoft.Network/networkSecurityGroups/', parameters('DMZNSGName'))]",
+        "[concat('Microsoft.Network/networkSecurityGroups/', parameters('APPNSGName'))]",
+        "[concat('Microsoft.Network/networkSecurityGroups/', parameters('INSNSGName'))]",
+        "[concat('Microsoft.Network/networkSecurityGroups/', parameters('AUTHNSGName'))]",
+        "[concat('Microsoft.Network/networkSecurityGroups/', parameters('BASTNSGName'))]"
+      ],
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": [
+            "[parameters('addressPrefix')]"
+          ]
+        },
+        "subnets": [
+          {
+            "name": "DMZ01",
+            "properties": {
+              "addressPrefix": "[parameters('DMZ01')]",
+              "networkSecurityGroup": {
+                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('DMZNSGName'))]"
+              }
+            }
+          },
+          {
+            "name": "APP01",
+            "properties": {
+              "addressPrefix": "[parameters('APP01')]",
+              "networkSecurityGroup": {
+                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('APPNSGName'))]"
+              }
+            }
+          },
+          {
+            "name": "INS01",
+            "properties": {
+              "addressPrefix": "[parameters('INS01')]",
+              "networkSecurityGroup": {
+                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('INSNSGName'))]"
+              }
+            }
+          },
+          {
+            "name": "AUTH01",
+            "properties": {
+              "addressPrefix": "[parameters('AUTH')]",
+              "networkSecurityGroup": {
+                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('AUTHNSGName'))]"
+              }
+            }
+          },
+          {
+            "name": "BASTION",
+            "properties": {
+              "addressPrefix": "[parameters('BASTION')]",
+              "networkSecurityGroup": {
+                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('BASTNSGName'))]"
+              }
+            }
+          },
+          {
+            "name": "GatewaySubnet",
+            "properties": {
+              "addressPrefix": "[parameters('GatewaySubnet')]"
+            }
+          }
+        ]
+      }
+    }
+  ]
+  
+
+}
